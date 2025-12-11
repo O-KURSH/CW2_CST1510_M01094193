@@ -10,51 +10,75 @@ def create_users_table(conn):
         );
     """)
     conn.commit()
+    print("Created users table (if not exists).")
 
 
 def create_cyber_incidents_table(conn):
-    """Create cyber incidents table."""
+    """
+    Create the cyber_incidents table.
+    """
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS cyber_incidents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            incident_type TEXT NOT NULL,
+            date TEXT,
+            incident_type TEXT,
             severity TEXT,
+            status TEXT,
             description TEXT,
-            date_reported TEXT
+            reported_by TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (reported_by) REFERENCES users(username)
         );
     """)
     conn.commit()
+    print("Created cyber_incidents table (if not exists).")
 
 
 def create_datasets_metadata_table(conn):
-    """Create datasets metadata table."""
+    """
+    Create the datasets_metadata table.
+    """
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS datasets_metadata (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             dataset_name TEXT NOT NULL,
-            description TEXT,
-            created_at TEXT
+            category TEXT,
+            source TEXT,
+            last_updated TEXT,
+            record_count INTEGER,
+            file_size_mb REAL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     """)
     conn.commit()
+    print("Created datasets_metadata table (if not exists).")
 
 
 def create_it_tickets_table(conn):
-    """Create IT support tickets table."""
+    """
+    Create the it_tickets table.
+    """
     cursor = conn.cursor()
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS it_tickets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            issue TEXT NOT NULL,
-            status TEXT DEFAULT 'open',
-            created_at TEXT,
-            FOREIGN KEY (user_id) REFERENCES users(id)
+            ticket_id TEXT UNIQUE NOT NULL,
+            priority TEXT,
+            status TEXT,
+            category TEXT,
+            subject TEXT NOT NULL,
+            description TEXT,
+            created_date TEXT,
+            resolved_date TEXT,
+            assigned_to TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (assigned_to) REFERENCES users(username)
         );
     """)
     conn.commit()
+    print("Created it_tickets table (if not exists).")
 
 
 def create_all_tables(conn):
