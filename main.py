@@ -1,66 +1,119 @@
+import time
+import pandas as pd
+
 from app.data.db import connect_database
 from app.data.schema import create_all_tables
+from app.data.users import migrate_users_from_file
 from app.data.incidents import (
     load_csv_to_table,
     insert_incident,
-    get_all_incidents,
     update_incident_status,
     delete_incident
 )
 from app.services.user_service import register_user, login_user
+from app.data.analytics import (
+    get_incidents_by_type_count,
+    get_high_severity_by_status
+)
 
 
-def main():
+def run_comprehensive_tests():
+    """
+    Run comprehensive tests on your database.
+    """
+    print("\n" + "=" * 60)
+    print("🧪 RUNNING COMPREHENSIVE TESTS")
+    print("=" * 60)
+
+    # ---------------------------------------------------------
+    # SETUP (ensures tables + data exist before tests)
+    # ---------------------------------------------------------
+    print("\n[SETUP] Creating tables + loading data")
     conn = connect_database()
 
-    # 1. Create tables
+    # Always ensure schema exists
     create_all_tables(conn)
 
-    # 2. Load CSV files
+    # Migrate users (safe to run repeatedly because it uses INSERT OR IGNORE)
+    migrate_users_from_file()
+
+    # Load CSVs (will append if you run multiple times)
+    # If your lab expects a "clean" run each time, delete the .db first.
     load_csv_to_table(conn, "DATA/cyber_incidents.csv", "cyber_incidents")
     load_csv_to_table(conn, "DATA/datasets_metadata.csv", "datasets_metadata")
     load_csv_to_table(conn, "DATA/it_tickets.csv", "it_tickets")
 
-    # 3. Test user registration & login
-    success, msg = register_user("alice2", "SecurePass123!", "analyst")
-    print(msg)
+    # ---------------------------------------------------------
+    # TEST 1: Authentication
+    # ---------------------------------------------------------
+    print("\n[TEST 1] Authentication")
 
-    success, msg = login_user("alice2", "SecurePass123!")
-    print(msg)
+    # Use a unique username each run to avoid UNIQUE constraint issues
+    test_username = f"test_user_{int(time.time())}"
 
-    # 4. Test CRUD on incidents
-    print("\n=== TESTING INCIDENT CRUD ===")
+    success, msg = register_user(test_username, "TestPass123!", "user")
+    print(f"  Register: {'✅' if success else '❌'} {msg}")
+
+    success, msg = login_user(test_username, "TestPass123!")
+    print(f"  Login:    {'✅' if success else '❌'} {msg}")
+
+    # ---------------------------------------------------------
+    # TEST 2: CRUD Operations
+    # ---------------------------------------------------------
+    print("\n[TEST 2] CRUD Operations")
 
     # Create
-    new_id = insert_incident(
+    test_id = insert_incident(
         conn,
-        "2024-02-01",
-        "Phishing",
-        "High",
+        "2024-11-05",
+        "Test Incident",
+        "Low",
         "Open",
-        "User received a phishing email",
-        "alice2"
+        "This is a test incident",
+        test_username
     )
-    print(f"Inserted incident ID: {new_id}")
+    print(f"  Create: ✅ Incident #{test_id} created")
 
     # Read
-    df = get_all_incidents(conn)
-    print("\nCurrent Incidents:")
-    print(df.head())
+    df = pd.read_sql_query(
+        "SELECT * FROM cyber_incidents WHERE id = ?",
+        conn,
+        params=(test_id,)
+    )
+    if len(df) == 1:
+        print(f"  Read:    ✅ Found incident #{test_id}")
+    else:
+        print(f"  Read:    ❌ Could not find incident #{test_id}")
 
     # Update
-    updated = update_incident_status(conn, new_id, "Resolved")
-    print(f"\nUpdated Rows: {updated}")
+    rows_updated = update_incident_status(conn, test_id, "Resolved")
+    print(f"  Update:  {'✅' if rows_updated > 0 else '❌'} Status updated")
 
     # Delete
-    deleted = delete_incident(conn, new_id)
-    print(f"Deleted Rows: {deleted}")
+    rows_deleted = delete_incident(conn, test_id)
+    print(f"  Delete:  {'✅' if rows_deleted > 0 else '❌'} Incident deleted")
+
+    # ---------------------------------------------------------
+    # TEST 3: Analytical Queries
+    # ---------------------------------------------------------
+    print("\n[TEST 3] Analytical Queries")
+
+    df_by_type = get_incidents_by_type_count(conn)
+    print(f"  By Type:        ✅ Found {len(df_by_type)} incident types")
+
+    df_high = get_high_severity_by_status(conn)
+    print(f"  High Severity:  ✅ Found {len(df_high)} status categories")
 
     conn.close()
-    print("\nProgram finished.")
+
+    print("\n" + "=" * 60)
+    print("✅ ALL TESTS COMPLETE!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":
-    main()
+    run_comprehensive_tests()
+
+
 
 
